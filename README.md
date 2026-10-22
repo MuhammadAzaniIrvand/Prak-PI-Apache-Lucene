@@ -183,13 +183,14 @@ Lalu akses **`http://localhost:8080`** di browser.
 ---
 
 ### Sesi 2: Indexing Dokumen (20 Menit)
-* **Rujukan Kode (`java/Indexer.java` baris 66–74):**
+* **Rujukan Kode (`java/Indexer.java`):**
   ```java
   Document luceneDoc = new Document();
   luceneDoc.add(new StringField("id", doc.getOrDefault("id", ""), Field.Store.YES));
   luceneDoc.add(new TextField("title", doc.getOrDefault("title", ""), Field.Store.YES));
   luceneDoc.add(new TextField("body", doc.getOrDefault("body", ""), Field.Store.YES));
   luceneDoc.add(new StoredField("url", doc.getOrDefault("url", "")));
+  luceneDoc.add(new StoredField("published_at", doc.getOrDefault("published_at", "")));
   ```
 * **Poin Penjelasan:**
   * **`StringField`**: Disimpan utuh untuk *exact match* (seperti ID berita).
@@ -199,12 +200,15 @@ Lalu akses **`http://localhost:8080`** di browser.
 ---
 
 ### Sesi 3: Searching & Scoring dengan `--explain` (20 Menit)
-* **Rujukan Kode (`java/Searcher.java` baris 50–55):**
+* **Rujukan Kode (`java/Searcher.java`):**
   ```java
   IndexSearcher searcher = new IndexSearcher(reader);
   searcher.setSimilarity(similarity);
+
   QueryParser parser = new QueryParser(field, analyzer);
   Query query = parser.parse(queryStr);
+
+  long startTime = System.currentTimeMillis();
   TopDocs topDocs = searcher.search(query, limit);
   ```
 * **Demonstrasi `--explain`:**
