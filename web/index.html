@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pencarian Berita ANTARA — Apache Lucene</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  header p { color: #666; font-size: 0.9rem; }
+
+  .search-box { display: flex; gap: 8px; margin-bottom: 16px; }
+  .search-box input {
+    flex: 1; padding: 10px 14px; font-size: 1rem;
+    border: 2px solid #ddd; border-radius: 6px; outline: none;
+  }
+  .search-box input:focus { border-color: #4a90d9; }
+  .search-box button {
+    padding: 10px 20px; font-size: 1rem; cursor: pointer;
+    background: #4a90d9; color: #fff; border: none; border-radius: 6px;
+  }
+  .search-box button:hover { background: #357abd; }
+
+  .options { display: flex; gap: 16px; margin-bottom: 24px; font-size: 0.85rem; color: #666; }
+  .options label { display: flex; align-items: center; gap: 4px; }
+  .options select, .options input[type="checkbox"] { cursor: pointer; }
+
+  .meta { font-size: 0.85rem; color: #666; margin-bottom: 16px; }
+
+  .result { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .result .rank-score { font-size: 0.8rem; color: #999; margin-bottom: 4px; }
+  .result .title a { font-size: 1.05rem; color: #1a0dab; text-decoration: none; }
+  .result .title a:hover { text-decoration: underline; }
+  .result .snippet { font-size: 0.9rem; color: #555; margin-top: 6px; line-height: 1.5; }
+  .result .explain-box {
+    margin-top: 10px; padding: 10px; background: #f9f9f0; border: 1px solid #e0dcc8;
+    border-radius: 4px; font-family: monospace; font-size: 0.75rem;
+    white-space: pre-wrap; max-height: 200px; overflow-y: auto; color: #555;
+  }
+
+  .empty { text-align: center; color: #999; margin-top: 48px; }
+  .error { background: #fee; color: #c33; padding: 12px; border-radius: 6px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Pencarian Berita ANTARA</h1>
+    <p>Powered by Apache Lucene &middot; Praktikum Penelusuran Informasi</p>
+  </header>
+
+  <div class="search-box">
+    <input type="text" id="queryInput" placeholder="Ketik kata kunci pencarian..." autofocus>
+    <button onclick="doSearch()">Cari</button>
+  </div>
+
+  <div class="options">
+    <label>Field:
+      <select id="fieldSelect">
+        <option value="body">body</option>
+        <option value="title">title</option>
+      </select>
+    </label>
+    <label>Limit:
+      <select id="limitSelect">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="20">20</option>
+      </select>
+    </label>
+    <label>
+      <input type="checkbox" id="explainCheck"> Tampilkan explain
+    </label>
+  </div>
+
+  <div id="metaInfo" class="meta"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+  function esc(s) {
+    if (!s) return "";
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  const input = document.getElementById("queryInput");
+  input.addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });
+
+  async function doSearch() {
+    const q = input.value.trim();
+    if (!q) return;
+
+    const field = document.getElementById("fieldSelect").value;
+    const limit = document.getElementById("limitSelect").value;
+    const explain = document.getElementById("explainCheck").checked;
+
+    const params = new URLSearchParams({ q, field, limit });
+    if (explain) params.set("explain", "true");
+
+    const metaDiv = document.getElementById("metaInfo");
+    const resultsDiv = document.getElementById("results");
+    metaDiv.textContent = "Mencari...";
+    resultsDiv.innerHTML = "";
+
+    try {
+      const resp = await fetch("/search?" + params);
+      const data = await resp.json();
+
+      if (data.error) {
+        resultsDiv.innerHTML = `<div class="error">${data.error}</div>`;
+        metaDiv.textContent = "";
+        return;
+      }
+
+      metaDiv.textContent = `${data.total_hits} hasil ditemukan (${data.elapsed_ms} ms) — field: ${data.field}`;
+
+      if (!data.results || data.results.length === 0) {
+        resultsDiv.innerHTML = `<div class="empty">Tidak ada hasil untuk "${q}"</div>`;
+        return;
+      }
+
+      resultsDiv.innerHTML = data.results.map(r => `
+        <div class="result">
+          <div class="rank-score">#${r.rank} &middot; skor: ${r.score.toFixed(4)}</div>
+          <div class="title"><a href="${esc(r.url)}" target="_blank">${esc(r.title)}</a></div>
+          <div class="snippet">${esc(r.snippet || "")}</div>
+          ${r.explain ? `<div class="explain-box">${esc(r.explain)}</div>` : ""}
+        </div>
+      `).join("");
+
+    } catch (err) {
+      resultsDiv.innerHTML = `<div class="error">Gagal menghubungi server: ${err.message}</div>`;
+      metaDiv.textContent = "";
+    }
+  }
+</script>
+</body>
+</html>
